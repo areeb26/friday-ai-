@@ -275,23 +275,31 @@ class FridayAgent(Agent):
     """
 
     def __init__(self, stt, llm, tts) -> None:
+        mcp_server = mcp.MCPServerHTTP(
+            url=_mcp_server_url(),
+            transport_type="sse",
+            client_session_timeout_seconds=30,
+        )
+        logger.info(f"MCP Server configured: {_mcp_server_url()}")
+        
         super().__init__(
             instructions=SYSTEM_PROMPT,
             stt=stt,
             llm=llm,
             tts=tts,
             vad=silero.VAD.load(),
-            mcp_servers=[
-                mcp.MCPServerHTTP(
-                    url=_mcp_server_url(),
-                    transport_type="sse",
-                    client_session_timeout_seconds=30,
-                ),
-            ],
+            mcp_servers=[mcp_server],
         )
+        logger.info("FridayAgent initialized with MCP server")
 
     async def on_enter(self) -> None:
         """Greet the user specifically for the late-night lab session."""
+        # Debug: Check if MCP tools are loaded
+        tools = self.session.tools
+        logger.info(f"FRIDAY loaded with {len(tools)} tools")
+        for tool in tools:
+            logger.info(f"  - Tool: {tool}")
+        
         await self.session.generate_reply(
             instructions=(
                 "Greet the user exactly with: 'Greetings boss, you're awake late at night today. What you up to?' "
