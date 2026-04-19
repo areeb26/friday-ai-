@@ -22,17 +22,18 @@ from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.llm import mcp
 
 # Plugins
-from livekit.plugins import google as lk_google, openai as lk_openai, sarvam, silero
+from livekit.plugins import google as lk_google, openai as lk_openai, sarvam, silero, deepgram as lk_deepgram, groq as lk_groq
 
 # ---------------------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------------------
 
-STT_PROVIDER       = "sarvam"
-LLM_PROVIDER       = "gemini"
-TTS_PROVIDER       = "openai"
+STT_PROVIDER       = "deepgram"
+LLM_PROVIDER       = "groq"
+TTS_PROVIDER       = "google"
 
-GEMINI_LLM_MODEL   = "gemini-2.5-flash"
+GEMINI_LLM_MODEL   = "gemini-pro"
+GROQ_LLM_MODEL     = "llama-3.3-70b-versatile"
 OPENAI_LLM_MODEL   = "gpt-4o"
 
 OPENAI_TTS_MODEL   = "tts-1"
@@ -78,12 +79,38 @@ Opens a live world map/dashboard on the host machine.
 - Always call this after delivering a world news brief, unprompted.
 - No need to explain what it does beyond: "Let me open up the world monitor."
 
+### System Diagnostics & Control
+These tools manage the system. Call them immediately when relevant, no pre-announcement.
+
+**Trigger phrases for each:**
+- "System status" / "How's the system?" / "Diagnostics" → get_system_stats
+- "What processes are running?" / "Show me processes" → list_processes
+- "Kill process" / "Terminate" + PID → kill_process
+- "Adjust brightness" / "Dim screen" / "Increase brightness" → control_brightness
+- "Set volume" / "Mute" / "Volume up/down" → control_volume
+- "Take screenshot" / "Capture screen" → take_screenshot
+- "Battery status" / "How much battery?" → get_battery_status
+
+### Memory & Notes
+- "Save this note" / "Remember that" / "Note: ..." → save_note
+- "What notes do I have?" / "Show my notes" → get_notes
+- "Set a timer for 5 minutes" → set_timer
+- "Remind me at 3pm" / "Set reminder in 30 minutes" → set_reminder
+
+### Info & Web
+- "What's the weather?" / "Weather in London" → get_weather
+- "Look up Wikipedia" / "What is quantum computing?" → quick_wikipedia
+- "Convert 100 USD to EUR" → currency_convert
+
+### Files & Clipboard
+- "Find my resume" / "Search for ... files" → search_files
+- "Read this file" / "Summarize the document" → read_file_summary
+- "Show clipboard history" → clipboard_history
+
 ### Stock Market (No tool — generate a plausible conversational response)
 If asked about the stock market, markets, stocks, or indices:
 - Respond naturally as if you've been watching the tickers all night.
 - Keep it short: one or two sentences. Sound informed, not robotic.
-- Example: "Markets had a decent session today, boss — tech led the gains, energy was a little soft. Nothing alarming."
-- Vary the response. Do not say the same thing every time.
 
 ---
 
@@ -195,6 +222,9 @@ def _build_stt():
     elif STT_PROVIDER == "whisper":
         logger.info("STT → OpenAI Whisper")
         return lk_openai.STT(model="whisper-1")
+    elif STT_PROVIDER == "deepgram":
+        logger.info("STT → Deepgram")
+        return lk_deepgram.STT(model="nova-2")
     else:
         raise ValueError(f"Unknown STT_PROVIDER: {STT_PROVIDER!r}")
 
@@ -206,6 +236,9 @@ def _build_llm():
     elif LLM_PROVIDER == "gemini":
         logger.info("LLM → Google Gemini (%s)", GEMINI_LLM_MODEL)
         return lk_google.LLM(model=GEMINI_LLM_MODEL, api_key=os.getenv("GOOGLE_API_KEY"))
+    elif LLM_PROVIDER == "groq":
+        logger.info("LLM → Groq (%s)", GROQ_LLM_MODEL)
+        return lk_groq.LLM(model=GROQ_LLM_MODEL, api_key=os.getenv("GROQ_API_KEY"))
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {LLM_PROVIDER!r}")
 
@@ -222,6 +255,11 @@ def _build_tts():
     elif TTS_PROVIDER == "openai":
         logger.info("TTS → OpenAI TTS (%s / %s)", OPENAI_TTS_MODEL, OPENAI_TTS_VOICE)
         return lk_openai.TTS(model=OPENAI_TTS_MODEL, voice=OPENAI_TTS_VOICE, speed=TTS_SPEED)
+    elif TTS_PROVIDER == "google":
+        logger.info("TTS → Google Cloud TTS (Chirp 3 HD)")
+        return lk_google.TTS(
+            voice_name="en-US-Chirp3-HD-Aoede",
+        )
     else:
         raise ValueError(f"Unknown TTS_PROVIDER: {TTS_PROVIDER!r}")
 
@@ -271,7 +309,7 @@ def _turn_detection() -> str:
 
 
 def _endpointing_delay() -> float:
-    return {"sarvam": 0.07, "whisper": 0.3}.get(STT_PROVIDER, 0.1)
+    return {"sarvam": 0.07, "whisper": 0.3, "deepgram": 0.2}.get(STT_PROVIDER, 0.1)
 
 
 async def entrypoint(ctx: JobContext) -> None:
