@@ -10,6 +10,12 @@ dependencies = [
     "livekit-agents[deepgram,groq,openai,sarvam,silero]>=1.5.1",
     "livekit-plugins-google>=1.5.1",
     "python-dotenv",
+    # FRIDAY 17 Tools dependencies
+    "psutil>=6.0.0",                    # System diagnostics & process control
+    "screen-brightness-control>=0.24.0", # Display brightness control
+    "pyautogui>=0.9.54",                # Screenshots & UI automation
+    "pyperclip>=1.9.0",                 # Clipboard access
+    "wikipedia>=1.4.0",                 # Wikipedia API
 ]
 
 [project.scripts]
